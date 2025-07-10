@@ -39,8 +39,7 @@ async def broadcast(message):
 
 app = web.Application()
 app.router.add_get('/ws', websocket_handler)   # websocket chạy ở /ws
-app.router.add_get('/health', health_check)    # health check /health
-app.router.add_head('/health', health_check)   # health check HEAD /health
+app.router.add_get('/health', health_check)    # health check /health  # health check HEAD /health
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 3000))
