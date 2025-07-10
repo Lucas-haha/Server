@@ -15,7 +15,10 @@ async def websocket_handler(request):
         async for msg in ws:
             if msg.type == web.WSMsgType.TEXT:
                 print(f"[Server] Nhận: {msg.data}")
-                await ws.send_str(f"Echo: {msg.data}")
+
+                # Gửi broadcast tới tất cả client, không chỉ client gửi
+                await broadcast(msg.data)
+
             elif msg.type == web.WSMsgType.ERROR:
                 print(f"[Server] Lỗi WebSocket: {ws.exception()}")
     finally:
