@@ -1,24 +1,28 @@
 import asyncio
-import websockets
-import os
+from aiohttp import web
 
 connected = set()
 
-async def handler(websocket):
-    connected.add(websocket)
+async def websocket_handler(request):
+    ws = web.WebSocketResponse()
+    await ws.prepare(request)
+
+    connected.add(ws)
     print(f"[Server] Client kết nối. Tổng client: {len(connected)}")
     try:
-        async for message in websocket:
-            print(f"[Server] Nhận: {message}")
-            # Echo lại client gửi
-            await websocket.send(f"Echo: {message}")
-    except websockets.ConnectionClosedOK:
-        print("[Server] Client đóng kết nối bình thường.")
-    except websockets.ConnectionClosedError:
-        print("[Server] Client đóng kết nối bất thường.")
+        async for msg in ws:
+            if msg.type == web.WSMsgType.TEXT:
+                print(f"[Server] Nhận: {msg.data}")
+                await ws.send_str(f"Echo: {msg.data}")
+            elif msg.type == web.WSMsgType.ERROR:
+                print(f"[Server] Lỗi WebSocket: {ws.exception()}")
     finally:
-        connected.remove(websocket)
+        connected.remove(ws)
         print(f"[Server] Client ngắt kết nối. Tổng client còn lại: {len(connected)}")
+    return ws
+
+async def health_check(request):
+    return web.Response(text="OK")
 
 async def broadcast(message):
     if not connected:
@@ -27,17 +31,17 @@ async def broadcast(message):
     dead = set()
     for ws in connected:
         try:
-            await ws.send(message)
+            await ws.send_str(message)
         except Exception as e:
             print(f"[Server] Lỗi gửi broadcast: {e}")
             dead.add(ws)
     connected.difference_update(dead)
 
-async def main():
-    port = int(os.environ.get("PORT", 3000))
-    async with websockets.serve(handler, "0.0.0.0", port):
-        print(f"[Server] Đang chạy trên port {port}")
-        await asyncio.Future()  # chạy mãi mãi
+app = web.Application()
+app.router.add_get('/ws', websocket_handler)   # websocket chạy ở /ws
+app.router.add_get('/health', health_check)    # health check /health
+app.router.add_head('/health', health_check)   # health check HEAD /health
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    port = int(os.environ.get("PORT", 3000))
+    web.run_app(app, host='0.0.0.0', port=port)
